@@ -4,6 +4,9 @@ A custom [Home Assistant](https://www.home-assistant.io/) Lovelace card for inte
 
 > **Note:** This card requires one or more existing `timer` entities in your Home Assistant instance. See [Prerequisites](#prerequisites) below.
 
+<img width="346" height="152" alt="image" src="https://github.com/user-attachments/assets/a6c5c5d0-ff92-4cd8-887f-21922ab81804" />
+
+
 ---
 
 ## Features
