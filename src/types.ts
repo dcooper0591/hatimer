@@ -8,6 +8,12 @@ export interface TimerCardConfig {
   name?: string;
   increments?: number[];
   show_controls?: boolean;
+  auto_start?: boolean;
+  show_name?: boolean;
+  show_state?: boolean;
+  notify_service?: string;
+  notify_title?: string;
+  notify_message?: string;
 }
 
 export interface HATimerAttributes {

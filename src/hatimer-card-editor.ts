@@ -21,6 +21,9 @@ export class HaTimerCardEditor extends LitElement {
 
     const increments = this._config.increments ?? DEFAULT_INCREMENTS;
     const showControls = this._config.show_controls !== false;
+    const showName = this._config.show_name !== false;
+    const showState = this._config.show_state !== false;
+    const autoStart = this._config.auto_start !== false;
 
     return html`
       <div class="editor-row">
@@ -56,6 +59,59 @@ export class HaTimerCardEditor extends LitElement {
           <div class="helper-text">
             Comma-separated list of minute values. Leave empty to hide increment buttons.
           </div>
+        </div>
+
+        <!-- Notify service -->
+        <ha-textfield
+          label="Notify Service (optional)"
+          .value=${this._config.notify_service ?? ''}
+          placeholder="e.g. notify.mobile_app_my_phone"
+          @change=${this._notifyServiceChanged}
+        ></ha-textfield>
+
+        ${this._config.notify_service
+          ? html`
+              <ha-textfield
+                label="Notification Title (optional)"
+                .value=${this._config.notify_title ?? ''}
+                placeholder="Timer Finished"
+                @change=${this._notifyTitleChanged}
+              ></ha-textfield>
+
+              <ha-textfield
+                label="Notification Message (optional)"
+                .value=${this._config.notify_message ?? ''}
+                placeholder="Uses entity name by default"
+                @change=${this._notifyMessageChanged}
+              ></ha-textfield>
+            `
+          : nothing}
+
+        <!-- Show name toggle -->
+        <div class="toggle-row">
+          <div class="row-label">Show name</div>
+          <ha-switch
+            .checked=${showName}
+            @change=${this._showNameChanged}
+          ></ha-switch>
+        </div>
+
+        <!-- Show state badge toggle -->
+        <div class="toggle-row">
+          <div class="row-label">Show state (Idle / Active / Paused)</div>
+          <ha-switch
+            .checked=${showState}
+            @change=${this._showStateChanged}
+          ></ha-switch>
+        </div>
+
+        <!-- Auto start toggle -->
+        <div class="toggle-row">
+          <div class="row-label">Auto-start timer when adding time from idle</div>
+          <ha-switch
+            .checked=${autoStart}
+            @change=${this._autoStartChanged}
+          ></ha-switch>
         </div>
 
         <!-- Show controls toggle -->
@@ -98,6 +154,48 @@ export class HaTimerCardEditor extends LitElement {
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => !isNaN(n) && n > 0);
     this._updateConfig({ increments: parsed });
+  }
+
+  private _notifyServiceChanged(ev: Event): void {
+    const value = (ev.target as HTMLInputElement).value.trim();
+    if (value) {
+      this._updateConfig({ notify_service: value });
+    } else {
+      const { notify_service: _a, notify_title: _b, notify_message: _c, ...rest } = this._config;
+      fireEvent(this, 'config-changed', { config: rest });
+    }
+  }
+
+  private _notifyTitleChanged(ev: Event): void {
+    const value = (ev.target as HTMLInputElement).value.trim();
+    if (value) {
+      this._updateConfig({ notify_title: value });
+    } else {
+      const { notify_title: _removed, ...rest } = this._config;
+      fireEvent(this, 'config-changed', { config: rest });
+    }
+  }
+
+  private _notifyMessageChanged(ev: Event): void {
+    const value = (ev.target as HTMLInputElement).value.trim();
+    if (value) {
+      this._updateConfig({ notify_message: value });
+    } else {
+      const { notify_message: _removed, ...rest } = this._config;
+      fireEvent(this, 'config-changed', { config: rest });
+    }
+  }
+
+  private _showNameChanged(ev: Event): void {
+    this._updateConfig({ show_name: (ev.target as HTMLInputElement).checked });
+  }
+
+  private _showStateChanged(ev: Event): void {
+    this._updateConfig({ show_state: (ev.target as HTMLInputElement).checked });
+  }
+
+  private _autoStartChanged(ev: Event): void {
+    this._updateConfig({ auto_start: (ev.target as HTMLInputElement).checked });
   }
 
   private _showControlsChanged(ev: Event): void {
