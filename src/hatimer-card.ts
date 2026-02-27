@@ -11,8 +11,13 @@ export class HaTimerCard extends LitElement {
   private _hass!: HomeAssistant;
   private _config!: TimerCardConfig;
   private _ticker: ReturnType<typeof setInterval> | undefined;
+  private _userCancelled = false;
 
   // ── Lovelace card API ────────────────────────────────────────────────────
+
+  static getGridOptions() {
+    return { min_columns: 6 };
+  }
 
   static async getConfigElement(): Promise<HTMLElement> {
     await import('./hatimer-card-editor.js');
@@ -41,11 +46,20 @@ export class HaTimerCard extends LitElement {
   }
 
   set hass(hass: HomeAssistant) {
-    const prevState = this._hass?.states[this._config?.entity ?? ''];
-    const nextState = hass.states[this._config?.entity ?? ''];
+    const entityId = this._config?.entity ?? '';
+    const prevState = this._hass?.states[entityId];
+    const nextState = hass.states[entityId];
     this._hass = hass;
     if (prevState !== nextState) {
       this._syncTicker(nextState?.state as TimerState | undefined);
+      // Detect natural finish: active → idle without the user pressing Cancel
+      if (prevState?.state === 'active' && nextState?.state === 'idle') {
+        if (this._userCancelled) {
+          this._userCancelled = false;
+        } else {
+          this._sendNotification(nextState.attributes as HATimerAttributes);
+        }
+      }
       this.requestUpdate();
     }
   }
@@ -78,16 +92,18 @@ export class HaTimerCard extends LitElement {
     const displayName = this._config.name ?? attrs.friendly_name ?? entityId;
     const increments = this._config.increments ?? DEFAULT_INCREMENTS;
     const showControls = this._config.show_controls !== false;
+    const showName = this._config.show_name !== false;
+    const showState = this._config.show_state !== false;
 
     const timeDisplay = this._computeDisplayTime(timerState, attrs);
 
     return html`
       <ha-card>
-        <div class="card-header">${displayName}</div>
+        ${showName ? html`<div class="card-header">${displayName}</div>` : nothing}
 
         <div class="timer-display">
           <div class="timer-time state-${timerState}">${timeDisplay}</div>
-          <div class="state-badge state-${timerState}">${timerState}</div>
+          ${showState ? html`<div class="state-badge state-${timerState}">${timerState}</div>` : nothing}
         </div>
 
         ${increments.length > 0
@@ -181,7 +197,11 @@ export class HaTimerCard extends LitElement {
     const newSeconds = baseSeconds + minutes * 60;
     const newDuration = this._secondsToHms(newSeconds);
 
-    this._hass.callService('timer', 'start', {
+    // When idle and auto_start is disabled, only update the duration without starting
+    const shouldAutoStart = this._config.auto_start !== false;
+    const service = state === 'idle' && !shouldAutoStart ? 'change' : 'start';
+
+    this._hass.callService('timer', service, {
       entity_id: this._config.entity,
       duration: newDuration,
     });
@@ -208,8 +228,25 @@ export class HaTimerCard extends LitElement {
   };
 
   private _cancel = (): void => {
+    this._userCancelled = true;
     this._hass.callService('timer', 'cancel', { entity_id: this._config.entity });
   };
+
+  // ── Notifications ────────────────────────────────────────────────────────
+
+  private _sendNotification(attrs: HATimerAttributes): void {
+    const service = this._config.notify_service;
+    if (!service) return;
+
+    const [domain, ...rest] = service.split('.');
+    const serviceAction = rest.join('.');
+
+    const entityName = this._config.name ?? attrs.friendly_name ?? this._config.entity;
+    const title = this._config.notify_title ?? 'Timer Finished';
+    const message = this._config.notify_message ?? `${entityName} has finished.`;
+
+    this._hass.callService(domain, serviceAction, { title, message });
+  }
 
   // ── Client-side ticker ───────────────────────────────────────────────────
 
